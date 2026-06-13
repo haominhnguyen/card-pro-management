@@ -16,6 +16,10 @@ out/
 !.env.example
 *.pem
 *.key
+# Local secret-provisioning scripts (contain real tokens — never commit)
+*.local.sh
+*.local.ps1
+set-secrets*
 
 # ---- Logs ----
 logs/
