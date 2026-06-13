@@ -72,7 +72,7 @@ jobs:
   # ── Deploy on the VPS (self-hosted runner) ────────────────────────────────────
   deploy:
     needs: build
-    runs-on: [self-hosted, vps]
+    runs-on: [self-hosted]
     if: github.ref == 'refs/heads/main'
     permissions:
       contents: read

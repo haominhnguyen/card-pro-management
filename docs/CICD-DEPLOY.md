@@ -45,14 +45,16 @@ On the VPS (Docker + the compose plugin must be installed — `deploy.sh` step 2
 
 ```bash
 # GitHub → repo → Settings → Actions → Runners → New self-hosted runner (Linux)
-# Follow the shown ./config.sh command, and when prompted for labels add: vps
+# Follow the shown ./config.sh command (the default `self-hosted` label is enough).
 # Then install it as a service so it survives reboots:
 sudo ./svc.sh install
 sudo ./svc.sh start
 ```
 
-The deploy job targets `runs-on: [self-hosted, vps]`, so the **`vps` label is required**.
-The runner's Linux user must be able to run `docker` (add it to the `docker` group).
+The deploy job targets `runs-on: [self-hosted]`, so the default `self-hosted` label
+matches. The runner's Linux user must be able to run `docker` (add it to the `docker`
+group). If you run multiple self-hosted runners, give this one a unique label and use it
+in `runs-on` to pin the deploy to the VPS.
 
 ### 3. GitHub secrets & variables
 
