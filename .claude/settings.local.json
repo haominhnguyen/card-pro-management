@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat /tmp/backend.log 2>/dev/null || echo \"backend.log not found\")",
+      "Read(//tmp/**)",
+      "Bash(cat /tmp/frontend.log 2>/dev/null || echo \"frontend.log not found\")",
+      "Bash(npm run *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(timeout 25 node dist/main.js)",
+      "Bash(xargs tail -30)",
+      "Bash(node dist/main.js)",
+      "Bash(curl -s -m 5 -w \"\\\\nHTTP:%{http_code}\\\\n\" http://localhost:3000/health)",
+      "Bash(curl -s -m 5 -w \"\\\\nHTTP:%{http_code}\\\\n\" http://localhost:3000/api/banks)",
+      "Bash(curl -s -m 5 -w \"\\\\nHTTP:%{http_code}\\\\n\" http://localhost:3000/api/cards)",
+      "Bash(curl -s -m 5 http://localhost:3000/api/banks)",
+      "Bash(curl -s -m 5 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/api/banks)",
+      "PowerShell($conns = Get-NetTCPConnection -LocalPort 3000 -State Listen -ErrorAction SilentlyContinue; if \\($conns\\) { $conns.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"Killed PID $_\" } catch {} } } else { \"No process on port 3000\" })",
+      "Bash(curl -s -m 8 -o /dev/null -w '%{http_code} %{size_download}b\\\\n' https://logo.clearbit.com/__TRACKED_VAR__)",
+      "Bash(curl -s -m 8 -o /dev/null -w '%{http_code} %{size_download}b\\\\n' 'https://www.google.com/s2/favicons?domain=__TRACKED_VAR__&sz=64')",
+      "Bash(curl -sL -m 8 -o /dev/null -w \"%{http_code} %{size_download}b %{content_type}\\\\n\" \"https://www.google.com/s2/favicons?domain=vietcombank.com.vn&sz=64\")",
+      "Bash(curl -sL -m 8 -o /dev/null -w \"%{http_code} %{size_download}b %{content_type}\\\\n\" \"https://www.google.com/s2/favicons?domain=techcombank.com.vn&sz=128\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\)['data']; print\\('count:', len\\(d\\)\\); vpb=[b for b in d if b['code']=='VPB'][0]; print\\('VPB creditCards:', vpb.get\\('creditCards'\\)\\); print\\('VPB logo:', vpb.get\\('logo'\\)\\)\")",
+      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Force)",
+      "PowerShell(\"node processes killed\")",
+      "Bash(python -c ' *)",
+      "Bash(curl -s -m 4 -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:3000/health)",
+      "Bash(node -e ' *)",
+      "PowerShell(\"cleared\")",
+      "Bash(curl -s -m 5 -X POST http://localhost:3000/api/cards -H \"Content-Type: application/json\" -d '{\"bank\":\"Techcombank\",\"cardName\":\"Techcombank Visa Signature\",\"creditLimit\":100000000,\"statementDate\":5}' -o /dev/null -w \"HTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -m 5 -X POST http://localhost:3000/api/cards -H \"Content-Type: application/json\" -d '{\"bank\":\"Techcombank\",\"cardName\":\"Techcombank Spark\",\"creditLimit\":50000000,\"statementDate\":10}' -o /dev/null -w \"HTTP %{http_code}\\\\n\")",
+      "Bash(curl -s -m 5 http://localhost:3000/api/cards)",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',\\(\\)=>{const d=JSON.parse\\(s\\).data;console.log\\('count:',d.length\\);d.forEach\\(c=>console.log\\(' -',c.bank,'|',c.cardName\\)\\);}\\)\")",
+      "Bash(node -e \"let s='';process.stdin.on\\('data',d=>s+=d\\).on\\('end',async\\(\\)=>{const d=JSON.parse\\(s\\).data;for\\(const c of d\\){require\\('child_process'\\).execSync\\('curl -s -m 5 -X DELETE http://localhost:3000/api/cards/'+c._id+' -o /dev/null'\\);console.log\\('deleted',c.bank,c.cardName\\);}}\\)\")",
+      "PowerShell(\"server stopped\")"
+    ]
+  }
+}

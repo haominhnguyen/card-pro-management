@@ -1,0 +1,100 @@
+# Production stack — deployed to the VPS by .github/workflows/deploy.yml.
+#
+# Differences from docker-compose.yml (the local/build stack):
+#   - backend/frontend run from pre-built GHCR images (no build on the VPS)
+#   - nothing is published to the host; the ONLY public entrypoint is Cloudflare
+#     Tunnel (cloudflared) → nginx (proxy) → frontend / backend
+#   - mongo stays internal to the docker network
+#
+# Run on the VPS:
+#   docker compose -f docker-compose.prod.yml pull
+#   docker compose -f docker-compose.prod.yml up -d
+
+services:
+  # ── MongoDB (internal only) ──────────────────────────────────────────────────
+  mongo:
+    image: mongo:7-jammy
+    container_name: credit_card_mongo
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    environment:
+      MONGO_INITDB_DATABASE: credit-card-db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - app
+
+  # ── NestJS Backend (image from GHCR) ──────────────────────────────────────────
+  backend:
+    image: ${BACKEND_IMAGE:-ghcr.io/haominhnguyen/card-pro-management/backend:latest}
+    container_name: credit_card_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/credit-card-db
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - app
+
+  # ── React Frontend (image from GHCR, static via its own nginx) ────────────────
+  frontend:
+    image: ${FRONTEND_IMAGE:-ghcr.io/haominhnguyen/card-pro-management/frontend:latest}
+    container_name: credit_card_frontend
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - app
+
+  # ── Edge reverse proxy (single internal entrypoint) ───────────────────────────
+  proxy:
+    image: nginx:1.27-alpine
+    container_name: credit_card_proxy
+    restart: unless-stopped
+    volumes:
+      - ./deploy/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - app
+
+  # ── Cloudflare Tunnel — the public door (no ports opened on the VPS) ──────────
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: credit_card_cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - proxy
+    networks:
+      - app
+
+networks:
+  app:
+    driver: bridge
+
+volumes:
+  mongo_data:
+    name: credit_card_mongo_data
+  mongo_config:
+    name: credit_card_mongo_config

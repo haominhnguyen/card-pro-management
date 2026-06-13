@@ -1,0 +1,20 @@
+# docker-compose.ssl.yml — SSL override
+# Used automatically by deploy.sh when --domain is passed.
+# Merges with docker-compose.yml:  docker compose -f docker-compose.yml -f docker-compose.ssl.yml up -d
+#
+# Changes from base:
+#   - frontend binds to 127.0.0.1:8080 instead of 0.0.0.0:80  (host nginx owns 80/443)
+#   - backend   binds to 127.0.0.1:3000 (already localhost, kept explicit)
+#   - VITE_API_URL build-arg picks up the domain-based URL from .env / deploy.sh
+
+services:
+  frontend:
+    build:
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
+    ports:
+      - "127.0.0.1:8080:80"
+
+  backend:
+    ports:
+      - "127.0.0.1:3000:3000"

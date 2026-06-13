@@ -1,0 +1,24 @@
+services:
+  mongo:
+    image: mongo:7-jammy
+    container_name: credit_card_mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - mongo_config:/data/configdb
+    environment:
+      MONGO_INITDB_DATABASE: credit-card-db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+volumes:
+  mongo_data:
+    name: credit_card_mongo_data
+  mongo_config:
+    name: credit_card_mongo_config

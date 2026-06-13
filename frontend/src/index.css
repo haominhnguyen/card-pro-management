@@ -1,0 +1,25 @@
+@import "tailwindcss";
+
+/*
+  Tailwind v4 + Ant Design v6 compatibility
+  CSS cascade order (highest → lowest):
+    1. Unlayered (antd CSS-in-JS) — always wins
+    2. @layer utilities   (Tailwind utility classes)
+    3. @layer base        (Tailwind preflight reset)
+    4. @layer theme       (Tailwind design tokens)
+*/
+
+body {
+  background-color: #f3f4f6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar hide utility — not included in Tailwind v4 standard */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
