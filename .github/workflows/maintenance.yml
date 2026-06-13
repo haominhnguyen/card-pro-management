@@ -1,0 +1,51 @@
+name: Daily maintenance (VPS)
+
+# Runs on the VPS self-hosted runner once a day to:
+#   1. health-check the running stack (fails loudly if a container is down/unhealthy)
+#   2. reclaim disk — prune unused images + build cache (mongo data volumes kept)
+# Manual run: Actions → Daily maintenance (VPS) → Run workflow.
+
+on:
+  schedule:
+    - cron: "0 20 * * *" # 20:00 UTC = 03:00 Asia/Ho_Chi_Minh (UTC+7)
+  workflow_dispatch:
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: [self-hosted]
+    steps:
+      - name: Disk usage (before)
+        run: df -h / | tail -1
+
+      - name: Health check stack
+        run: |
+          bad=""
+          for c in credit_card_mongo credit_card_backend credit_card_frontend credit_card_proxy credit_card_cloudflared; do
+            if [ -z "$(docker ps -q -f name=^${c}$)" ]; then
+              echo "::error::container $c is NOT running"; bad=1; continue
+            fi
+            state=$(docker inspect -f '{{.State.Status}}{{if .State.Health}} ({{.State.Health.Status}}){{end}}' "$c")
+            echo "$c -> $state"
+            case "$state" in *unhealthy*) echo "::error::$c is unhealthy"; bad=1 ;; esac
+          done
+          # Backend application health endpoint.
+          if ! docker exec credit_card_backend wget -qO- http://localhost:3000/health >/dev/null 2>&1; then
+            echo "::error::backend /health did not respond"; bad=1
+          fi
+          [ -z "$bad" ] && echo "All services healthy." || exit 1
+
+      # Always reclaim disk, even if the health check failed.
+      - name: Prune unused images & build cache
+        if: always()
+        run: |
+          docker image prune -af
+          docker builder prune -af || true
+          docker container prune -f || true
+
+      - name: Disk usage (after)
+        if: always()
+        run: df -h / | tail -1

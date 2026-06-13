@@ -125,9 +125,17 @@ jobs:
             sleep 3
           done
           echo "Backend did not become healthy in time." >&2
-          docker compose -f docker-compose.prod.yml logs --tail=50 backend
           exit 1
 
-      - name: Prune dangling images
+      # On any failure above (e.g. unhealthy backend), surface the container logs in CI.
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.prod.yml logs --tail=80 backend mongo || true
+
+      # Free disk: drop ALL images no running container uses (old sha-tagged images
+      # from previous deploys pile up otherwise). Named volumes (mongo data) are untouched.
+      - name: Free disk — prune unused images
         if: always()
-        run: docker image prune -f
+        run: |
+          docker image prune -af
+          df -h / | tail -1
