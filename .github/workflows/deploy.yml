@@ -127,6 +127,29 @@ jobs:
           echo "Backend did not become healthy in time." >&2
           exit 1
 
+      # Print the access endpoints to the run's Summary page (and the log).
+      - name: Deploy summary
+        if: success()
+        env:
+          APP_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          url="${APP_URL:-<set repo variable VITE_API_URL>}"
+          {
+            echo "## ✅ Deploy thành công — \`${GITHUB_SHA::7}\`"
+            echo ""
+            echo "| | Endpoint |"
+            echo "|---|---|"
+            echo "| 🖥️ Ứng dụng (SPA) | ${url}/ |"
+            echo "| 🔌 API | ${url}/api |"
+            echo "| ❤️ Health | ${url}/health |"
+            echo "| 🔄 WebSocket | ${url}/socket.io/ |"
+            echo ""
+            echo "### Containers"
+            echo '```'
+            docker compose -f docker-compose.prod.yml ps 2>&1 || true
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
       # On any failure above (e.g. unhealthy backend), surface the container logs in CI.
       - name: Dump logs on failure
         if: failure()
