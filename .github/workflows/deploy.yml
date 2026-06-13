@@ -13,18 +13,34 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# Never run two deploys at once; let an in-flight deploy finish (don't cancel).
+# One run per branch: a newer push cancels the older in-flight run (build + deploy)
+# so we never waste minutes building/deploying a commit that's already superseded.
 concurrency:
   group: deploy-${{ github.ref }}
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   # ── Fast build on GitHub-hosted runners → push to GHCR ────────────────────────
+  # backend & frontend build CONCURRENTLY (one runner each) so wall-clock ≈ the
+  # slower of the two, not their sum. Each has its own gha cache scope.
   build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            context: ./backend
+            build-args: ""
+          - service: frontend
+            context: ./frontend
+            # Baked into the SPA at build time. Set repo Variable VITE_API_URL to your
+            # public origin, e.g. https://card.yourdomain.com (same origin as the API).
+            build-args: |
+              VITE_API_URL=${{ vars.VITE_API_URL }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -43,31 +59,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build & push backend
+      - name: Build & push ${{ matrix.service }}
         uses: docker/build-push-action@v6
         with:
-          context: ./backend
+          context: ${{ matrix.context }}
           push: true
+          build-args: ${{ matrix.build-args }}
           tags: |
-            ${{ env.IMAGE_BASE }}/backend:latest
-            ${{ env.IMAGE_BASE }}/backend:${{ github.sha }}
-          cache-from: type=gha,scope=backend
-          cache-to: type=gha,mode=max,scope=backend
-
-      - name: Build & push frontend
-        uses: docker/build-push-action@v6
-        with:
-          context: ./frontend
-          push: true
-          # Baked into the SPA at build time. Set repo Variable VITE_API_URL to your
-          # public origin, e.g. https://card.yourdomain.com (same origin as the API).
-          build-args: |
-            VITE_API_URL=${{ vars.VITE_API_URL }}
-          tags: |
-            ${{ env.IMAGE_BASE }}/frontend:latest
-            ${{ env.IMAGE_BASE }}/frontend:${{ github.sha }}
-          cache-from: type=gha,scope=frontend
-          cache-to: type=gha,mode=max,scope=frontend
+            ${{ env.IMAGE_BASE }}/${{ matrix.service }}:latest
+            ${{ env.IMAGE_BASE }}/${{ matrix.service }}:${{ github.sha }}
+          cache-from: type=gha,scope=${{ matrix.service }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          # Single-arch image, no SLSA/SBOM attestations → faster export and a clean
+          # single manifest (avoids the manifest-list that can trip `compose pull`).
+          provenance: false
+          sbom: false
 
   # ── Deploy on the VPS (self-hosted runner) ────────────────────────────────────
   deploy:
