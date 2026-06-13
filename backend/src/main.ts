@@ -16,9 +16,13 @@ async function bootstrap() {
   // running; re-throw anything else so genuine bugs still surface.
   process.on('unhandledRejection', (reason: any) => {
     const tgCode = reason?.response?.error_code ?? (reason?.name === 'TelegramError' ? reason?.code : undefined);
-    if (tgCode != null || reason?.name === 'TelegramError') {
+    // node-fetch network failures hitting the Telegram API (e.g. a transient TLS reset
+    // on the very first getMe at startup) arrive as FetchError, not TelegramError.
+    const isTelegramFetchError =
+      reason?.name === 'FetchError' && /api\.telegram\.org/.test(String(reason?.message ?? ''));
+    if (tgCode != null || reason?.name === 'TelegramError' || isTelegramFetchError) {
       customLogger.warn(
-        `Telegram bot disabled (error ${tgCode ?? '?'}): ${reason?.response?.description ?? reason?.message}. ` +
+        `Telegram bot issue (${tgCode ?? reason?.name}): ${reason?.response?.description ?? reason?.message}. ` +
           'Đảm bảo chỉ chạy MỘT instance backend với cùng bot token. API/Auth vẫn hoạt động bình thường.',
         'Telegram',
       );
