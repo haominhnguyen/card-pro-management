@@ -1,5 +1,5 @@
 # ── Stage 1: Build ────────────────────────────────────────────────────────────
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY . .
 RUN npm run build
 
 # ── Stage 2: Production dependencies only ─────────────────────────────────────
-FROM node:20-alpine AS deps
+FROM node:24-alpine AS deps
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY package*.json ./
 RUN npm ci --omit=dev
 
 # ── Stage 3: Minimal runtime ──────────────────────────────────────────────────
-FROM node:20-alpine AS runner
+FROM node:24-alpine AS runner
 
 # Non-root user
 RUN addgroup -g 1001 -S nodejs \
