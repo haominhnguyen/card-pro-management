@@ -9,6 +9,7 @@ import { AuthProvider, useAuth } from './auth/AuthContext';
 import ProtectedRoute from './auth/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { queryClient, qk } from './hooks/queryClient';
 import { useCards, useTransactions, useStats, useBanks } from './hooks/useData';
 import { appTheme } from './lib/theme';
@@ -192,6 +193,7 @@ function AppRoutes() {
     <Routes>
       <Route path="/login" element={<PublicOnly><LoginPage /></PublicOnly>} />
       <Route path="/register" element={<PublicOnly><RegisterPage /></PublicOnly>} />
+      <Route path="/forgot-password" element={<PublicOnly><ForgotPasswordPage /></PublicOnly>} />
       <Route element={<ProtectedRoute />}>
         <Route path="/*" element={<AppContent />} />
       </Route>

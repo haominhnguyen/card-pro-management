@@ -22,6 +22,17 @@ export interface RegisterPayload {
   password: string;
 }
 
+export interface ResetPasswordPayload {
+  email: string;
+  otp: string;
+  password: string;
+}
+
+export interface SimpleResult {
+  success: boolean;
+  message: string;
+}
+
 export const authApi = {
   login: (data: LoginPayload): Promise<AuthSession> =>
     axiosClient.post('/api/auth/login', data),
@@ -30,4 +41,8 @@ export const authApi = {
   refresh: (): Promise<AuthSession> => axiosClient.post('/api/auth/refresh'),
   logout: (): Promise<{ success: boolean }> => axiosClient.post('/api/auth/logout'),
   me: (): Promise<AuthUser> => axiosClient.get('/api/auth/me'),
+  forgotPassword: (email: string): Promise<SimpleResult> =>
+    axiosClient.post('/api/auth/forgot-password', { email }),
+  resetPassword: (data: ResetPasswordPayload): Promise<SimpleResult> =>
+    axiosClient.post('/api/auth/reset-password', data),
 };

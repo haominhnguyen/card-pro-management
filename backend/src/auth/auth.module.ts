@@ -8,13 +8,19 @@ import { AuthService } from './auth.service';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { JwtRefreshStrategy } from './strategies/jwt-refresh.strategy';
 import { User, UserSchema } from './schemas/user.schema';
+import { PasswordReset, PasswordResetSchema } from './schemas/password-reset.schema';
+import { MailModule } from '../mail/mail.module';
 
 @Module({
   imports: [
     ConfigModule,
     PassportModule,
     JwtModule.register({}),
-    MongooseModule.forFeature([{ name: User.name, schema: UserSchema }]),
+    MailModule,
+    MongooseModule.forFeature([
+      { name: User.name, schema: UserSchema },
+      { name: PasswordReset.name, schema: PasswordResetSchema },
+    ]),
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtRefreshStrategy],

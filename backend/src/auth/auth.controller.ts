@@ -14,6 +14,8 @@ import { Request, Response } from 'express';
 import { AuthService, AuthResult } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -61,6 +63,26 @@ export class AuthController {
   ) {
     const result = await this.authService.refresh(user.userId, user.refreshToken);
     return this.respondWithSession(res, result);
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.requestPasswordReset(dto.email);
+    // Always the same response — never reveal whether the email is registered.
+    return {
+      success: true,
+      message: 'Nếu email tồn tại, mã xác thực đã được gửi.',
+    };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.email, dto.otp, dto.password);
+    return { success: true, message: 'Đặt lại mật khẩu thành công.' };
   }
 
   @Post('logout')

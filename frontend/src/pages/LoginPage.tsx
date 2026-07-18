@@ -54,9 +54,16 @@ export default function LoginPage() {
           name="password"
           label="Mật khẩu"
           rules={[{ required: true, message: 'Vui lòng nhập mật khẩu' }]}
+          className="mb-2"
         >
           <Input.Password size="large" prefix={<LockOutlined className="text-gray-400" />} placeholder="••••••••" autoComplete="current-password" />
         </Form.Item>
+
+        <div className="flex justify-end mb-4">
+          <Link to="/forgot-password" className="text-sm font-medium text-blue-600 hover:text-blue-700">
+            Quên mật khẩu?
+          </Link>
+        </div>
 
         <Form.Item className="mb-3">
           <Button type="primary" htmlType="submit" size="large" block loading={submitting}>
