@@ -103,12 +103,23 @@ jobs:
         env:
           PROD_ENV_FILE: ${{ secrets.PROD_ENV_FILE }}
           CLOUDFLARE_TUNNEL_TOKEN: ${{ secrets.CLOUDFLARE_TUNNEL_TOKEN }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
         run: |
           printf '%s\n' "$PROD_ENV_FILE" > .env
           {
             echo "CLOUDFLARE_TUNNEL_TOKEN=$CLOUDFLARE_TUNNEL_TOKEN"
             echo "BACKEND_IMAGE=${IMAGE_BASE}/backend:${GITHUB_SHA}"
             echo "FRONTEND_IMAGE=${IMAGE_BASE}/frontend:${GITHUB_SHA}"
+            # Email / SMTP for password-reset OTP. Non-secret host/port are literal;
+            # credentials come from repo secrets.
+            echo "SMTP_HOST=smtp.gmail.com"
+            echo "SMTP_PORT=587"
+            echo "SMTP_SECURE=false"
+            echo "SMTP_USER=$SMTP_USER"
+            echo "SMTP_PASS=$SMTP_PASS"
+            echo "MAIL_FROM=$MAIL_FROM"
           } >> .env
 
       - name: Pull images & start stack
