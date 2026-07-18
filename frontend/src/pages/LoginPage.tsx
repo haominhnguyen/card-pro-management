@@ -82,7 +82,7 @@ export default function LoginPage() {
         disabled={submitting}
         className="mb-4"
       >
-        Trải nghiệm thử — không cần đăng nhập
+        Dùng thử với dữ liệu mẫu
       </Button>
 
       <p className="text-center text-sm text-gray-500 mb-0">
