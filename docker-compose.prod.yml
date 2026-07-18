@@ -16,17 +16,31 @@ services:
     image: mongo:7-jammy
     container_name: credit_card_mongo
     restart: unless-stopped
+    # Cap WiredTiger's cache. Its default floor is 256 MB, which on a ~950 MB
+    # host (shared with another stack) is enough to push the box into swap and
+    # cause the huge BLOCK I/O seen in `docker stats`. 0.25 GB keeps it bounded.
+    command: ["--wiredTigerCacheSizeGB", "0.25"]
     volumes:
       - mongo_data:/data/db
       - mongo_config:/data/configdb
     environment:
       MONGO_INITDB_DATABASE: credit-card-db
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 128M
     healthcheck:
       test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
+      # A full mongosh spawn (~60 MB Node) every 10s is costly on a small host and
+      # was flapping to `unhealthy` under memory pressure. Poll less often and give
+      # it more slack so a brief GC/swap pause doesn't take mongo (and the backend
+      # that gates on it) down.
+      interval: 30s
+      timeout: 15s
       retries: 5
-      start_period: 20s
+      start_period: 40s
     networks:
       - app
 
@@ -43,7 +57,13 @@ services:
       # Prefer IPv4 when resolving outbound hosts (e.g. api.telegram.org). Many VPSes
       # lack working IPv6 egress, so Node's default would pick a dead AAAA route and
       # telegraf's getMe() fails with an empty FetchError reason.
-      NODE_OPTIONS: --dns-result-order=ipv4first
+      NODE_OPTIONS: --dns-result-order=ipv4first --max-old-space-size=192
+    deploy:
+      resources:
+        limits:
+          memory: 300M
+        reservations:
+          memory: 96M
     depends_on:
       mongo:
         condition: service_healthy
@@ -64,6 +84,12 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+        reservations:
+          memory: 16M
     networks:
       - app
 
@@ -77,6 +103,12 @@ services:
     depends_on:
       - frontend
       - backend
+    deploy:
+      resources:
+        limits:
+          memory: 48M
+        reservations:
+          memory: 16M
     networks:
       - app
 
@@ -90,6 +122,12 @@ services:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - proxy
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 32M
     networks:
       - app
 
