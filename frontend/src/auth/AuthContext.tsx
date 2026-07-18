@@ -8,7 +8,13 @@ import {
   type ReactNode,
 } from 'react';
 import { Spin } from 'antd';
-import { authApi, type AuthUser, type LoginPayload, type RegisterPayload } from '../api/authApi';
+import {
+  authApi,
+  type AuthUser,
+  type LoginPayload,
+  type RegisterPayload,
+  type VerifyRegistrationPayload,
+} from '../api/authApi';
 import { setOnAuthFailure } from '../api/axiosClient';
 import { setAccessToken, clearAccessToken } from './tokenStore';
 import { queryClient } from '../hooks/queryClient';
@@ -22,7 +28,10 @@ interface AuthContextValue {
   /** true when running in trial / experience mode (no real session). */
   demo: boolean;
   login: (data: LoginPayload) => Promise<void>;
+  /** Step 1: submit details → backend emails an OTP. Does NOT create a session. */
   register: (data: RegisterPayload) => Promise<void>;
+  /** Step 2: confirm the emailed OTP → account created and logged in. */
+  verifyRegistration: (data: VerifyRegistrationPayload) => Promise<void>;
   /** Enter trial mode — full app, in-memory seeded data, no backend. */
   enterDemo: () => void;
   logout: () => Promise<void>;
@@ -88,7 +97,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(async (data: RegisterPayload) => {
-    const session = await authApi.register(data);
+    // Triggers the verification email; the session is established later, in verifyRegistration.
+    await authApi.register(data);
+  }, []);
+
+  const verifyRegistration = useCallback(async (data: VerifyRegistrationPayload) => {
+    const session = await authApi.verifyRegistration(data);
     setAccessToken(session.accessToken);
     setUser(session.user);
     setStatus('authenticated');
@@ -120,8 +134,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ user, status, demo, login, register, enterDemo, logout }),
-    [user, status, demo, login, register, enterDemo, logout],
+    () => ({ user, status, demo, login, register, verifyRegistration, enterDemo, logout }),
+    [user, status, demo, login, register, verifyRegistration, enterDemo, logout],
   );
 
   if (status === 'loading') {

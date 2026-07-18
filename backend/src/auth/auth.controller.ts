@@ -16,6 +16,7 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
+import { VerifyRegistrationDto } from './dto/verify-registration.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -34,12 +35,28 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  async register(
-    @Body() dto: RegisterDto,
+  async register(@Body() dto: RegisterDto) {
+    // No session yet — the account is created only after email verification.
+    return this.authService.register(dto);
+  }
+
+  @Public()
+  @Post('verify-registration')
+  @HttpCode(HttpStatus.OK)
+  async verifyRegistration(
+    @Body() dto: VerifyRegistrationDto,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const result = await this.authService.register(dto);
+    const result = await this.authService.verifyRegistration(dto.email, dto.otp);
     return this.respondWithSession(res, result);
+  }
+
+  @Public()
+  @Post('resend-registration-otp')
+  @HttpCode(HttpStatus.OK)
+  async resendRegistrationOtp(@Body() dto: ForgotPasswordDto) {
+    await this.authService.resendRegistrationOtp(dto.email);
+    return { success: true, message: 'Nếu đang chờ xác minh, mã mới đã được gửi.' };
   }
 
   @Public()
@@ -69,12 +86,9 @@ export class AuthController {
   @Post('forgot-password')
   @HttpCode(HttpStatus.OK)
   async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    // Throws 404/403 if the email isn't a usable account (see requestPasswordReset).
     await this.authService.requestPasswordReset(dto.email);
-    // Always the same response — never reveal whether the email is registered.
-    return {
-      success: true,
-      message: 'Nếu email tồn tại, mã xác thực đã được gửi.',
-    };
+    return { success: true, message: 'Mã xác thực đã được gửi đến email của bạn.' };
   }
 
   @Public()

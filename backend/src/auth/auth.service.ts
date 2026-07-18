@@ -1,8 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  ForbiddenException,
   Injectable,
   Logger,
+  NotFoundException,
+  ServiceUnavailableException,
   UnauthorizedException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +16,10 @@ import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
 import { User, UserDocument } from './schemas/user.schema';
 import { PasswordReset, PasswordResetDocument } from './schemas/password-reset.schema';
+import {
+  PendingRegistration,
+  PendingRegistrationDocument,
+} from './schemas/pending-registration.schema';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { MailService } from '../mail/mail.service';
@@ -29,6 +36,12 @@ export interface AuthResult {
   refreshToken: string;
 }
 
+/** Returned by register(): the account isn't created until the email is verified. */
+export interface PendingVerification {
+  requiresVerification: true;
+  email: string;
+}
+
 const BCRYPT_ROUNDS = 10;
 const OTP_TTL_MINUTES = 10;
 const OTP_MAX_ATTEMPTS = 5;
@@ -41,12 +54,18 @@ export class AuthService {
     @InjectModel(User.name) private userModel: Model<UserDocument>,
     @InjectModel(PasswordReset.name)
     private resetModel: Model<PasswordResetDocument>,
+    @InjectModel(PendingRegistration.name)
+    private pendingModel: Model<PendingRegistrationDocument>,
     private jwtService: JwtService,
     private config: ConfigService,
     private mailService: MailService,
   ) {}
 
-  async register(dto: RegisterDto): Promise<AuthResult> {
+  /**
+   * Step 1 of sign-up: park the details in a pending collection and email an OTP.
+   * The real User is NOT created yet — so the email stays free until it's verified.
+   */
+  async register(dto: RegisterDto): Promise<PendingVerification> {
     const email = dto.email.toLowerCase().trim();
     const existing = await this.userModel.findOne({ email }).exec();
     if (existing) {
@@ -54,14 +73,81 @@ export class AuthService {
     }
 
     const passwordHash = await bcrypt.hash(dto.password, BCRYPT_ROUNDS);
+    const otp = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = await bcrypt.hash(otp, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+
+    await this.pendingModel
+      .updateOne(
+        { email },
+        { $set: { email, name: dto.name.trim(), passwordHash, codeHash, expiresAt, attempts: 0 } },
+        { upsert: true },
+      )
+      .exec();
+
+    await this.mailService.sendEmailVerificationOtp(email, dto.name.trim(), otp, OTP_TTL_MINUTES);
+    this.logger.log(`Registration pending email verification: ${email}`);
+    return { requiresVerification: true, email };
+  }
+
+  /**
+   * Step 2 of sign-up: verify the OTP, then actually create the account and log in.
+   */
+  async verifyRegistration(rawEmail: string, otp: string): Promise<AuthResult> {
+    const email = rawEmail.toLowerCase().trim();
+    const pending = await this.pendingModel.findOne({ email }).exec();
+
+    if (!pending || pending.expiresAt.getTime() < Date.now()) {
+      throw new BadRequestException('Mã không hợp lệ hoặc đã hết hạn');
+    }
+
+    if (pending.attempts >= OTP_MAX_ATTEMPTS) {
+      await this.pendingModel.deleteOne({ email }).exec();
+      throw new BadRequestException('Bạn đã nhập sai quá nhiều lần. Vui lòng đăng ký lại.');
+    }
+
+    const valid = await bcrypt.compare(otp, pending.codeHash);
+    if (!valid) {
+      await this.pendingModel.updateOne({ email }, { $inc: { attempts: 1 } }).exec();
+      throw new BadRequestException('Mã xác thực không đúng');
+    }
+
+    // Guard against a race: someone may have registered this email meanwhile.
+    const existing = await this.userModel.findOne({ email }).exec();
+    if (existing) {
+      await this.pendingModel.deleteOne({ email }).exec();
+      throw new ConflictException('Email đã được sử dụng');
+    }
+
     const user = await this.userModel.create({
       email,
-      name: dto.name.trim(),
-      passwordHash,
+      name: pending.name,
+      passwordHash: pending.passwordHash,
     });
+    await this.pendingModel.deleteOne({ email }).exec();
 
-    this.logger.log(`New user registered: ${email}`);
+    this.logger.log(`New user registered (email verified): ${email}`);
     return this.issueTokens(user);
+  }
+
+  /** Re-issue a fresh verification OTP for a pending sign-up. */
+  async resendRegistrationOtp(rawEmail: string): Promise<void> {
+    const email = rawEmail.toLowerCase().trim();
+    const pending = await this.pendingModel.findOne({ email }).exec();
+    if (!pending) {
+      // Nothing pending (expired or never started) — stay quiet, same as forgot-password.
+      this.logger.log(`Resend verification requested with no pending sign-up: ${email}`);
+      return;
+    }
+
+    const otp = String(randomInt(0, 1_000_000)).padStart(6, '0');
+    const codeHash = await bcrypt.hash(otp, BCRYPT_ROUNDS);
+    const expiresAt = new Date(Date.now() + OTP_TTL_MINUTES * 60 * 1000);
+    await this.pendingModel
+      .updateOne({ email }, { $set: { codeHash, expiresAt, attempts: 0 } })
+      .exec();
+
+    await this.mailService.sendEmailVerificationOtp(email, pending.name, otp, OTP_TTL_MINUTES);
   }
 
   async login(dto: LoginDto): Promise<AuthResult> {
@@ -118,17 +204,23 @@ export class AuthService {
 
   /**
    * Start a password reset: generate a 6-digit OTP, email it, and store only its
-   * hash (upsert — a new request replaces any prior code). Returns silently whether
-   * or not the email exists, so the endpoint can't be used to enumerate accounts.
+   * hash (upsert — a new request replaces any prior code).
+   *
+   * By product choice we tell the caller when the email isn't registered (clearer UX),
+   * instead of the anti-enumeration "always succeed" pattern. Edge cases handled:
+   *   - no account            → 404 "Email chưa được đăng ký"
+   *   - account deactivated   → 403 "Tài khoản đã bị vô hiệu hoá"
+   *   - email delivery fails  → 502 so the user knows to retry (no silent success)
    */
   async requestPasswordReset(rawEmail: string): Promise<void> {
     const email = rawEmail.toLowerCase().trim();
     const user = await this.userModel.findOne({ email }).exec();
 
-    // No account (or deactivated) → do nothing, but don't reveal that to the caller.
-    if (!user || !user.isActive) {
-      this.logger.log(`Password reset requested for unknown/inactive email: ${email}`);
-      return;
+    if (!user) {
+      throw new NotFoundException('Email chưa được đăng ký');
+    }
+    if (!user.isActive) {
+      throw new ForbiddenException('Tài khoản đã bị vô hiệu hoá, vui lòng liên hệ hỗ trợ');
     }
 
     // 6-digit code, 000000–999999. crypto.randomInt is cryptographically secure.
@@ -147,8 +239,9 @@ export class AuthService {
     try {
       await this.mailService.sendPasswordResetOtp(email, user.name, otp, OTP_TTL_MINUTES);
     } catch {
-      // Delivery failure shouldn't leak via a 500; the user can request a new code.
-      this.logger.warn(`Reset OTP generated for ${email} but email delivery failed.`);
+      // Roll back the stored code so a later attempt starts clean, and surface the failure.
+      await this.resetModel.deleteOne({ email }).exec();
+      throw new ServiceUnavailableException('Không gửi được email, vui lòng thử lại sau');
     }
   }
 

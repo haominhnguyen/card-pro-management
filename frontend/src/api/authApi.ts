@@ -22,6 +22,17 @@ export interface RegisterPayload {
   password: string;
 }
 
+/** register() no longer logs in — the account is created only after email OTP verification. */
+export interface PendingVerification {
+  requiresVerification: true;
+  email: string;
+}
+
+export interface VerifyRegistrationPayload {
+  email: string;
+  otp: string;
+}
+
 export interface ResetPasswordPayload {
   email: string;
   otp: string;
@@ -36,8 +47,12 @@ export interface SimpleResult {
 export const authApi = {
   login: (data: LoginPayload): Promise<AuthSession> =>
     axiosClient.post('/api/auth/login', data),
-  register: (data: RegisterPayload): Promise<AuthSession> =>
+  register: (data: RegisterPayload): Promise<PendingVerification> =>
     axiosClient.post('/api/auth/register', data),
+  verifyRegistration: (data: VerifyRegistrationPayload): Promise<AuthSession> =>
+    axiosClient.post('/api/auth/verify-registration', data),
+  resendRegistrationOtp: (email: string): Promise<SimpleResult> =>
+    axiosClient.post('/api/auth/resend-registration-otp', { email }),
   refresh: (): Promise<AuthSession> => axiosClient.post('/api/auth/refresh'),
   logout: (): Promise<{ success: boolean }> => axiosClient.post('/api/auth/logout'),
   me: (): Promise<AuthUser> => axiosClient.get('/api/auth/me'),

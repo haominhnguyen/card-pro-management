@@ -69,8 +69,60 @@ export class MailService {
     }
   }
 
-  /** Clean, table-based responsive HTML — renders reliably across mail clients. */
+  /** Send the email-verification one-time code for a new sign-up. */
+  async sendEmailVerificationOtp(to: string, name: string, otp: string, ttlMinutes: number): Promise<void> {
+    const subject = `${this.appName} — Mã xác minh email`;
+    const html = this.otpTemplate({
+      name,
+      otp,
+      ttlMinutes,
+      heading: 'Xác minh email',
+      intro: 'Cảm ơn bạn đã đăng ký! Dùng mã dưới đây để xác minh email và hoàn tất tạo tài khoản.',
+      ignoreNote: 'Nếu bạn không đăng ký tài khoản, hãy bỏ qua email này.',
+    });
+    const text =
+      `Xin chào ${name || ''},\n\n` +
+      `Mã xác minh email của bạn là: ${otp}\n` +
+      `Mã có hiệu lực trong ${ttlMinutes} phút.\n\n` +
+      `Nếu bạn không đăng ký, hãy bỏ qua email này.`;
+
+    if (!this.transporter) {
+      this.logger.warn(`[DEV] Email verification OTP for ${to}: ${otp} (valid ${ttlMinutes}m)`);
+      return;
+    }
+
+    try {
+      await this.transporter.sendMail({ from: this.from, to, subject, html, text });
+      this.logger.log(`Email verification OTP sent to ${to}`);
+    } catch (err) {
+      this.logger.error(
+        `Failed to send verification OTP to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      throw err;
+    }
+  }
+
   private passwordResetTemplate(name: string, otp: string, ttlMinutes: number): string {
+    return this.otpTemplate({
+      name,
+      otp,
+      ttlMinutes,
+      heading: 'Đặt lại mật khẩu',
+      intro: 'Dùng mã xác thực dưới đây để đặt lại mật khẩu cho tài khoản của bạn.',
+      ignoreNote: 'Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này — tài khoản của bạn vẫn an toàn.',
+    });
+  }
+
+  /** Clean, table-based responsive HTML — renders reliably across mail clients. */
+  private otpTemplate(opts: {
+    name: string;
+    otp: string;
+    ttlMinutes: number;
+    heading: string;
+    intro: string;
+    ignoreNote: string;
+  }): string {
+    const { name, otp, ttlMinutes, heading, intro, ignoreNote } = opts;
     const brand = '#1677ff';
     const greeting = name ? `Xin chào ${this.escape(name)},` : 'Xin chào,';
     return `<!doctype html>
@@ -89,9 +141,9 @@ export class MailService {
         </td></tr>
         <!-- body -->
         <tr><td style="padding:32px;">
-          <h1 style="margin:0 0 8px;font-size:20px;color:#111827;">Đặt lại mật khẩu</h1>
+          <h1 style="margin:0 0 8px;font-size:20px;color:#111827;">${this.escape(heading)}</h1>
           <p style="margin:0 0 20px;font-size:14px;line-height:1.6;color:#4b5563;">
-            ${greeting}<br>Dùng mã xác thực dưới đây để đặt lại mật khẩu cho tài khoản của bạn.
+            ${greeting}<br>${this.escape(intro)}
           </p>
           <div style="text-align:center;margin:24px 0;">
             <div style="display:inline-block;background:#f0f5ff;border:1px solid #d6e4ff;border-radius:12px;padding:16px 28px;">
@@ -102,7 +154,7 @@ export class MailService {
             Mã có hiệu lực trong <strong>${ttlMinutes} phút</strong>.
           </p>
           <p style="margin:24px 0 0;font-size:12px;line-height:1.6;color:#9ca3af;border-top:1px solid #f0f0f0;padding-top:16px;">
-            Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua email này — tài khoản của bạn vẫn an toàn.
+            ${this.escape(ignoreNote)}
           </p>
         </td></tr>
       </table>

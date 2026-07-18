@@ -1,8 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Form, Input, Button, Divider, App as AntApp } from 'antd';
-import { MailOutlined, LockOutlined, UserOutlined, ExperimentOutlined } from '@ant-design/icons';
+import {
+  MailOutlined,
+  LockOutlined,
+  UserOutlined,
+  ExperimentOutlined,
+  ArrowLeftOutlined,
+  SafetyCertificateOutlined,
+} from '@ant-design/icons';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { authApi } from '../api/authApi';
 import { getErrorMessage } from '../auth/getErrorMessage';
 import AuthLayout from './AuthLayout';
 
@@ -12,11 +20,26 @@ interface FormValues {
   password: string;
 }
 
+type Step = 'details' | 'verify';
+
+const RESEND_COOLDOWN_SECONDS = 45;
+
 export default function RegisterPage() {
   const { message } = AntApp.useApp();
-  const { register, enterDemo } = useAuth();
+  const { register, verifyRegistration, enterDemo } = useAuth();
   const navigate = useNavigate();
+
+  const [step, setStep] = useState<Step>('details');
+  const [email, setEmail] = useState('');
+  const [otp, setOtp] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const t = setTimeout(() => setCooldown((c) => c - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
 
   const handleTryDemo = () => {
     enterDemo();
@@ -24,12 +47,15 @@ export default function RegisterPage() {
     navigate('/dashboard', { replace: true });
   };
 
-  const handleSubmit = async (values: FormValues) => {
+  const handleDetails = async (values: FormValues) => {
     setSubmitting(true);
     try {
       await register(values);
-      message.success('Tạo tài khoản thành công');
-      navigate('/dashboard', { replace: true });
+      setEmail(values.email);
+      setOtp('');
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      setStep('verify');
+      message.success('Đã gửi mã xác minh đến email của bạn');
     } catch (err) {
       message.error(getErrorMessage(err, 'Không thể tạo tài khoản'));
     } finally {
@@ -37,9 +63,89 @@ export default function RegisterPage() {
     }
   };
 
+  const handleResend = async () => {
+    if (cooldown > 0) return;
+    try {
+      await authApi.resendRegistrationOtp(email);
+      setCooldown(RESEND_COOLDOWN_SECONDS);
+      message.success('Đã gửi lại mã xác minh');
+    } catch (err) {
+      message.error(getErrorMessage(err, 'Không thể gửi lại mã'));
+    }
+  };
+
+  const handleVerify = async () => {
+    if (otp.length !== 6) {
+      message.error('Vui lòng nhập đủ 6 chữ số của mã xác minh');
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await verifyRegistration({ email, otp });
+      message.success('Xác minh thành công, chào mừng bạn!');
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      message.error(getErrorMessage(err, 'Mã không đúng hoặc đã hết hạn'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  if (step === 'verify') {
+    return (
+      <AuthLayout
+        title="Xác minh email"
+        subtitle={`Chúng tôi đã gửi mã 6 chữ số đến ${email}. Mã có hiệu lực trong 10 phút.`}
+      >
+        <Form layout="vertical" requiredMark={false} onFinish={handleVerify} disabled={submitting}>
+          <Form.Item label="Mã xác minh (OTP)" className="mb-2">
+            <Input.OTP
+              length={6}
+              size="large"
+              value={otp}
+              onChange={setOtp}
+              formatter={(str) => str.replace(/\D/g, '')}
+            />
+          </Form.Item>
+
+          <div className="mb-5 -mt-1 text-sm">
+            {cooldown > 0 ? (
+              <span className="text-gray-400">Gửi lại mã sau {cooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResend}
+                className="font-medium text-blue-600 hover:text-blue-700 bg-transparent border-0 p-0 cursor-pointer"
+              >
+                Gửi lại mã
+              </button>
+            )}
+          </div>
+
+          <Form.Item className="mb-3">
+            <Button type="primary" htmlType="submit" size="large" block loading={submitting} icon={<SafetyCertificateOutlined />}>
+              Xác minh & tạo tài khoản
+            </Button>
+          </Form.Item>
+        </Form>
+
+        <p className="text-center text-sm text-gray-500 mb-0">
+          <button
+            type="button"
+            onClick={() => setStep('details')}
+            className="font-medium text-blue-600 hover:text-blue-700 bg-transparent border-0 p-0 cursor-pointer"
+          >
+            <ArrowLeftOutlined className="mr-1" />
+            Sửa thông tin đăng ký
+          </button>
+        </p>
+      </AuthLayout>
+    );
+  }
+
   return (
     <AuthLayout title="Tạo tài khoản" subtitle="Bắt đầu quản lý thẻ tín dụng của bạn.">
-      <Form layout="vertical" requiredMark={false} onFinish={handleSubmit} disabled={submitting}>
+      <Form layout="vertical" requiredMark={false} onFinish={handleDetails} disabled={submitting}>
         <Form.Item
           name="name"
           label="Họ tên"
