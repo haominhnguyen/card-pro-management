@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { Drawer, Form, Input, InputNumber, Button, Typography, AutoComplete, Tag, Divider, Space } from 'antd';
 import { App as AntApp } from 'antd';
 import { CreditCardOutlined, CheckOutlined } from '@ant-design/icons';
-import { useCreateCard } from '../hooks/useData';
+import { useCreateCard, useUpdateCard } from '../hooks/useData';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { vndFormatter, vndParser } from '../lib/format';
 import BankLogo from './BankLogo';
@@ -17,16 +18,35 @@ interface Props {
   banks: Bank[];
   /** Existing cards — used to flag card types already added per bank. */
   cards: CreditCard[];
+  /** When set, the drawer edits this card instead of creating a new one. */
+  editing?: CreditCard | null;
   onClose: () => void;
   onSuccess: () => void;
 }
 
-export default function AddCardDrawer({ open, banks, cards, onClose, onSuccess }: Props) {
+export default function AddCardDrawer({ open, banks, cards, editing, onClose, onSuccess }: Props) {
   const { message } = AntApp.useApp();
   const [form] = Form.useForm();
   const isMobile = useIsMobile();
   const createMut = useCreateCard();
-  const submitting = createMut.isPending;
+  const updateMut = useUpdateCard();
+  const isEdit = !!editing;
+  const submitting = createMut.isPending || updateMut.isPending;
+
+  // Prefill (edit) or clear (create) whenever the drawer opens or the target changes.
+  useEffect(() => {
+    if (!open) return;
+    if (editing) {
+      form.setFieldsValue({
+        bank: editing.bank,
+        cardName: editing.cardName,
+        creditLimit: editing.creditLimit,
+        statementDate: editing.statementDate,
+      });
+    } else {
+      form.resetFields();
+    }
+  }, [open, editing, form]);
   const selectedBankName = Form.useWatch('bank', form);
   const cardNameValue = Form.useWatch('cardName', form);
   const creditLimitValue = Form.useWatch('creditLimit', form);
@@ -67,29 +87,38 @@ export default function AddCardDrawer({ open, banks, cards, onClose, onSuccess }
   const handleSubmit = async (values: { bank: string; cardName: string; creditLimit: number; statementDate: number }) => {
     const bank = values.bank.trim();
     const cardName = values.cardName.trim();
-    // A bank may hold many cards, but each card type must be unique within it.
-    if (cards.some(c => c.bank === bank && c.cardName.trim().toLowerCase() === cardName.toLowerCase())) {
+    // A bank may hold many cards, but each card type must be unique within it
+    // (excluding the card currently being edited).
+    if (
+      cards.some(
+        c =>
+          c._id !== editing?._id &&
+          c.bank === bank &&
+          c.cardName.trim().toLowerCase() === cardName.toLowerCase(),
+      )
+    ) {
       message.warning(`Thẻ "${cardName}" của ${bank} đã tồn tại`);
       return;
     }
+    const payload = { ...values, bank, cardName, creditLimit: Math.round(values.creditLimit) };
     try {
-      await createMut.mutateAsync({
-        ...values,
-        bank,
-        cardName,
-        creditLimit: Math.round(values.creditLimit),
-      });
-      message.success('Thêm thẻ thành công');
+      if (isEdit && editing) {
+        await updateMut.mutateAsync({ id: editing._id, data: payload });
+        message.success('Cập nhật thẻ thành công');
+      } else {
+        await createMut.mutateAsync(payload);
+        message.success('Thêm thẻ thành công');
+      }
       form.resetFields();
       onSuccess();
     } catch {
-      message.error('Lỗi khi thêm thẻ. Vui lòng thử lại.');
+      message.error(isEdit ? 'Lỗi khi cập nhật thẻ. Vui lòng thử lại.' : 'Lỗi khi thêm thẻ. Vui lòng thử lại.');
     }
   };
 
   return (
     <Drawer
-      title="Thêm thẻ tín dụng"
+      title={isEdit ? 'Sửa thẻ tín dụng' : 'Thêm thẻ tín dụng'}
       placement="right"
       width={isMobile ? '100%' : 420}
       open={open}
@@ -97,7 +126,7 @@ export default function AddCardDrawer({ open, banks, cards, onClose, onSuccess }
       styles={{ body: { paddingBottom: 80 } }}
       extra={
         <Button type="primary" loading={submitting} onClick={() => form.submit()}>
-          Lưu thẻ
+          {isEdit ? 'Cập nhật' : 'Lưu thẻ'}
         </Button>
       }
     >

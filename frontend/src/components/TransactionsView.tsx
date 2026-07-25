@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Table, Tag, Button, Select, Input, Segmented, Typography, Empty, DatePicker, Collapse, Tooltip, Modal, Space } from 'antd';
 import { App as AntApp } from 'antd';
 import {
   BankOutlined, SearchOutlined, FilterOutlined, CloseOutlined,
-  PlusOutlined, EditOutlined, DeleteOutlined,
+  PlusOutlined, EditOutlined, DeleteOutlined, DownloadOutlined,
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import type { Dayjs } from 'dayjs';
@@ -30,10 +30,17 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
   const deleteMut = useDeleteTransaction();
 
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterBank, setFilterBank] = useState('all');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('all');
   const [dateRange, setDateRange] = useState<[Dayjs, Dayjs] | null>(null);
+
+  // Debounce the search box so a big list isn't re-filtered on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim().toLowerCase()), 250);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const bankNames = useMemo(() => [...new Set(transactions.map(t => t.bank))].sort(), [transactions]);
   const categories = useMemo(() => [...new Set(transactions.map(t => t.category))].sort(), [transactions]);
@@ -43,14 +50,19 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
       if (filterBank !== 'all' && t.bank !== filterBank) return false;
       if (filterType !== 'all' && t.type !== filterType) return false;
       if (filterCategory !== 'all' && t.category !== filterCategory) return false;
-      if (search && !t.description.toLowerCase().includes(search.toLowerCase())) return false;
+      // Search across description, category and card name (not description-only).
+      if (
+        debouncedSearch &&
+        !`${t.description} ${t.category} ${t.cardName ?? ''} ${t.bank}`.toLowerCase().includes(debouncedSearch)
+      )
+        return false;
       if (dateRange) {
         const d = dayjs(t.date);
         if (d.isBefore(dateRange[0], 'day') || d.isAfter(dateRange[1], 'day')) return false;
       }
       return true;
     });
-  }, [transactions, filterBank, filterType, filterCategory, search, dateRange]);
+  }, [transactions, filterBank, filterType, filterCategory, debouncedSearch, dateRange]);
 
   const totalExpense = filtered.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
   const totalIncome = filtered.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
@@ -64,6 +76,44 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
     setFilterType('all');
     setFilterCategory('all');
     setDateRange(null);
+  };
+
+  // Export the currently-filtered rows to a CSV the user can open in Excel.
+  const exportCsv = () => {
+    if (filtered.length === 0) {
+      message.info('Không có giao dịch để xuất');
+      return;
+    }
+    const header = ['Ngày', 'Loại', 'Ngân hàng', 'Thẻ', 'Danh mục', 'Số tiền', 'Mô tả'];
+    const esc = (v: string | number) => {
+      const s = String(v ?? '');
+      return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const rows = filtered.map(t =>
+      [
+        dayjs(t.date).format('DD/MM/YYYY HH:mm'),
+        t.type === 'expense' ? 'Chi tiêu' : 'Thu/Hoàn',
+        t.bank,
+        t.cardName ?? '',
+        t.category,
+        t.amount,
+        t.description,
+      ]
+        .map(esc)
+        .join(','),
+    );
+    // Leading BOM so Excel reads UTF-8 (Vietnamese) correctly.
+    const csv = '﻿' + [header.join(','), ...rows].join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `giao-dich-${dayjs().format('YYYYMMDD-HHmm')}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    message.success(`Đã xuất ${filtered.length} giao dịch`);
   };
 
   const handleDelete = (tx: Transaction) => {
@@ -152,10 +202,11 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
   const filterControls = (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
       <Input
-        placeholder="Tìm kiếm mô tả..."
+        placeholder="Tìm mô tả, danh mục, thẻ..."
         prefix={<SearchOutlined className="text-gray-300" />}
         value={search}
         onChange={e => setSearch(e.target.value)}
+        aria-label="Tìm kiếm giao dịch"
         allowClear
       />
       <Select
@@ -213,11 +264,16 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
         </div>
         <div className="flex items-center gap-2">
           {hasFilter && (
-            <Button size="small" icon={<CloseOutlined />} onClick={clearFilters}>
+            <Button size="small" icon={<CloseOutlined />} onClick={clearFilters} aria-label="Xóa bộ lọc">
               <span className="hidden sm:inline">Xóa bộ lọc</span>
             </Button>
           )}
-          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd}>
+          <Tooltip title="Xuất CSV">
+            <Button icon={<DownloadOutlined />} onClick={exportCsv} aria-label="Xuất giao dịch ra CSV">
+              <span className="hidden sm:inline">Xuất CSV</span>
+            </Button>
+          </Tooltip>
+          <Button type="primary" icon={<PlusOutlined />} onClick={onAdd} aria-label="Thêm giao dịch">
             <span className="hidden sm:inline">Thêm giao dịch</span>
           </Button>
         </div>
@@ -289,6 +345,7 @@ export default function TransactionsView({ transactions, banks, loading, onAdd, 
             loading={loading}
             pagination={{ pageSize: 20, showSizeChanger: true, showTotal: total => `${total} giao dịch`, position: ['bottomRight'] }}
             size="middle"
+            scroll={{ x: 900 }}
           />
         </div>
       )}

@@ -196,6 +196,13 @@ function createCard(data: CardInput): CreditCard {
   return { ...card };
 }
 
+function updateCard(id: string, data: Partial<CardInput>): CreditCard {
+  let updated: CreditCard | undefined;
+  cards = cards.map(c => (c._id === id ? (updated = { ...c, ...data, updatedAt: new Date().toISOString() }) : c));
+  if (!updated) throw new Error('Không tìm thấy thẻ');
+  return { ...updated };
+}
+
 function deleteCard(id: string): void {
   cards = cards.filter(c => c._id !== id);
 }
@@ -228,6 +235,7 @@ export const demoStore = {
   getByCategory,
   getMonthly,
   createCard,
+  updateCard,
   deleteCard,
   createTransaction,
   updateTransaction,

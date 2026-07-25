@@ -13,7 +13,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import { queryClient, qk } from './hooks/queryClient';
 import { useCards, useTransactions, useStats, useBanks } from './hooks/useData';
 import { appTheme } from './lib/theme';
-import type { Transaction } from './types';
+import type { Transaction, CreditCard } from './types';
 import AppHeader from './components/AppHeader';
 import AddTransactionDrawer from './components/AddTransactionDrawer';
 import AddCardDrawer from './components/AddCardDrawer';
@@ -46,9 +46,12 @@ function AppContent() {
   const [txDrawer, setTxDrawer] = useState(false);
   const [editingTx, setEditingTx] = useState<Transaction | null>(null);
   const [cardDrawer, setCardDrawer] = useState(false);
+  const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
 
   const openAddTx = () => { setEditingTx(null); setTxDrawer(true); };
   const openEditTx = (tx: Transaction) => { setEditingTx(tx); setTxDrawer(true); };
+  const openAddCard = () => { setEditingCard(null); setCardDrawer(true); };
+  const openEditCard = (card: CreditCard) => { setEditingCard(card); setCardDrawer(true); };
 
   // Surface connection failures as a toast (with a retry action).
   useEffect(() => {
@@ -124,7 +127,7 @@ function AppContent() {
                   stats={stats}
                   banks={banks}
                   loading={loading}
-                  onAddCard={() => setCardDrawer(true)}
+                  onAddCard={openAddCard}
                   onAddTransaction={openAddTx}
                   onViewAll={() => navigate('/transactions')}
                   onViewCards={() => navigate('/cards')}
@@ -139,7 +142,8 @@ function AppContent() {
                   stats={stats}
                   banks={banks}
                   loading={loading}
-                  onAddCard={() => setCardDrawer(true)}
+                  onAddCard={openAddCard}
+                  onEditCard={openEditCard}
                 />
               }
             />
@@ -172,8 +176,9 @@ function AppContent() {
         open={cardDrawer}
         banks={banks}
         cards={cards}
-        onClose={() => setCardDrawer(false)}
-        onSuccess={() => setCardDrawer(false)}
+        editing={editingCard}
+        onClose={() => { setCardDrawer(false); setEditingCard(null); }}
+        onSuccess={() => { setCardDrawer(false); setEditingCard(null); }}
       />
     </div>
   );

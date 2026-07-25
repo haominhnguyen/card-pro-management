@@ -106,13 +106,14 @@ export default function AppHeader({ onAddTransaction }: Props) {
 
           {/* Add transaction CTA + user menu */}
           <div className="flex items-center gap-2.5">
-            <Button type="primary" icon={<PlusOutlined />} onClick={onAddTransaction}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={onAddTransaction} aria-label="Thêm giao dịch">
               <span className="hidden sm:inline">Thêm giao dịch</span>
             </Button>
             <Dropdown menu={{ items: userMenu }} trigger={['click']} placement="bottomRight">
               <Avatar
                 className="cursor-pointer bg-blue-600 select-none"
                 icon={<UserOutlined />}
+                aria-label="Tài khoản"
               >
                 {user?.name?.trim()?.charAt(0)?.toUpperCase()}
               </Avatar>
@@ -121,7 +122,7 @@ export default function AppHeader({ onAddTransaction }: Props) {
         </div>
 
         {/* Mobile nav */}
-        <div className="flex md:hidden gap-1 pb-2 overflow-x-auto scrollbar-hide">
+        <nav aria-label="Điều hướng" className="flex md:hidden gap-1 pb-2 overflow-x-auto scrollbar-hide">
           {NAV_ITEMS.map(item => (
             <NavLink
               key={item.to}
@@ -138,7 +139,7 @@ export default function AppHeader({ onAddTransaction }: Props) {
               {item.label}
             </NavLink>
           ))}
-        </div>
+        </nav>
       </div>
     </header>
     <LinkTelegramModal open={tgOpen} onClose={() => setTgOpen(false)} />

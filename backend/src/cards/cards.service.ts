@@ -1,8 +1,15 @@
-import { ConflictException, Injectable, Logger, OnModuleInit } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  Logger,
+  NotFoundException,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { Card, CardDocument } from './schemas/card.schema';
 import { CreateCardDto } from './dto/create-card.dto';
+import { UpdateCardDto } from './dto/update-card.dto';
 
 @Injectable()
 export class CardsService implements OnModuleInit {
@@ -51,6 +58,26 @@ export class CardsService implements OnModuleInit {
     return this.cardModel
       .findOne({ userId, bank: new RegExp('^' + bank + '$', 'i') })
       .exec();
+  }
+
+  async update(id: string, dto: UpdateCardDto, userId: string): Promise<Card> {
+    try {
+      const updated = await this.cardModel
+        .findOneAndUpdate({ _id: id, userId }, { $set: dto }, { new: true, runValidators: true })
+        .exec();
+      if (!updated) {
+        throw new NotFoundException('Không tìm thấy thẻ');
+      }
+      return updated;
+    } catch (error: any) {
+      // Duplicate (bank + cardName) after rename — surface as 409.
+      if (error?.code === 11000) {
+        throw new ConflictException(
+          `Thẻ "${dto.cardName ?? ''}" của ${dto.bank ?? ''} đã tồn tại`,
+        );
+      }
+      throw error;
+    }
   }
 
   async deleteById(id: string, userId: string): Promise<Card | null> {

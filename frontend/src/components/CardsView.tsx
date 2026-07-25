@@ -1,6 +1,6 @@
 import { Spin, Empty, Button, Tag, Tooltip, Modal } from 'antd';
 import { App as AntApp } from 'antd';
-import { PlusOutlined, DeleteOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useDeleteCard } from '../hooks/useData';
 import { cardUsage } from '../lib/stats';
 import BankLogo from './BankLogo';
@@ -12,11 +12,12 @@ interface Props {
   banks: Bank[];
   loading: boolean;
   onAddCard: () => void;
+  onEditCard: (card: CreditCard) => void;
 }
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 
-export default function CardsView({ cards, stats, banks, loading, onAddCard }: Props) {
+export default function CardsView({ cards, stats, banks, loading, onAddCard, onEditCard }: Props) {
   const { message } = AntApp.useApp();
   const deleteMut = useDeleteCard();
 
@@ -70,7 +71,7 @@ export default function CardsView({ cards, stats, banks, loading, onAddCard }: P
               <div className="flex-1 text-xs font-medium text-gray-400 uppercase tracking-wide">Thẻ</div>
               <div className="w-44 text-right text-xs font-medium text-gray-400 uppercase tracking-wide">Khả dụng</div>
               <div className="w-52 text-xs font-medium text-gray-400 uppercase tracking-wide">Sử dụng</div>
-              <div className="w-8" />
+              <div className="w-[72px]" />
             </div>
 
             {/* Card rows */}
@@ -151,16 +152,29 @@ export default function CardsView({ cards, stats, banks, loading, onAddCard }: P
                       </div>
                     </div>
 
-                    {/* Delete — visible on row hover only */}
-                    <Tooltip title="Xóa thẻ">
-                      <button
-                        onClick={() => handleDelete(card)}
-                        style={{ background: 'transparent' }}
-                        className="w-8 h-8 flex-shrink-0 rounded-md flex items-center justify-center text-gray-300 hover:text-red-400 hover:bg-red-50 transition-colors cursor-pointer border-0 opacity-0 group-hover:opacity-100"
-                      >
-                        <DeleteOutlined style={{ fontSize: 12 }} />
-                      </button>
-                    </Tooltip>
+                    {/* Actions — always visible (touch devices have no hover) */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <Tooltip title="Sửa thẻ">
+                        <button
+                          aria-label={`Sửa thẻ ${card.cardName}`}
+                          onClick={() => onEditCard(card)}
+                          style={{ background: 'transparent' }}
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-blue-500 hover:bg-blue-50 transition-colors cursor-pointer border-0"
+                        >
+                          <EditOutlined style={{ fontSize: 14 }} />
+                        </button>
+                      </Tooltip>
+                      <Tooltip title="Xóa thẻ">
+                        <button
+                          aria-label={`Xóa thẻ ${card.cardName}`}
+                          onClick={() => handleDelete(card)}
+                          style={{ background: 'transparent' }}
+                          className="w-8 h-8 rounded-md flex items-center justify-center text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors cursor-pointer border-0"
+                        >
+                          <DeleteOutlined style={{ fontSize: 14 }} />
+                        </button>
+                      </Tooltip>
+                    </div>
                   </div>
                 );
               })}

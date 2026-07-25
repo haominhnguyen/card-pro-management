@@ -76,6 +76,15 @@ export function useCreateCard() {
   });
 }
 
+export function useUpdateCard() {
+  const invalidate = useInvalidateAll();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<Parameters<typeof cardsApi.create>[0]> }) =>
+      isDemo() ? Promise.resolve(demoStore.updateCard(id, data)) : cardsApi.update(id, data),
+    onSuccess: invalidate,
+  });
+}
+
 export function useDeleteCard() {
   const invalidate = useInvalidateAll();
   return useMutation({
