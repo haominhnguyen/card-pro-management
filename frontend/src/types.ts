@@ -13,6 +13,8 @@ export interface Transaction {
   amount: number;
   bank: string;
   cardName?: string;
+  /** Card._id this transaction is attributed to (resolved server-side). */
+  cardId?: string;
   category: string;
   description: string;
   date: string;

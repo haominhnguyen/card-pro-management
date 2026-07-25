@@ -53,6 +53,11 @@ export class CardsService implements OnModuleInit {
     return this.cardModel.findOne({ _id: id, userId }).exec();
   }
 
+  /** All cards across all users — used only by the transaction cardId backfill. */
+  async listAll(): Promise<CardDocument[]> {
+    return this.cardModel.find().exec();
+  }
+
   async findByBank(bank: string, userId: string): Promise<Card | null> {
     // case insensitive search
     return this.cardModel

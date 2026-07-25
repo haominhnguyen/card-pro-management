@@ -19,6 +19,12 @@ export class Transaction {
   @Prop()
   cardName: string;
 
+  // Card._id this transaction is attributed to. Optional — resolved from
+  // (bank + cardName) on create/update and backfilled at startup. Enables
+  // accurate per-card stats even when a bank holds several cards.
+  @Prop({ index: true })
+  cardId?: string;
+
   @Prop({ required: true })
   category: string;
 

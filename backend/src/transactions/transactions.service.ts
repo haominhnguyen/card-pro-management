@@ -3,6 +3,7 @@ import {
   Injectable,
   Logger,
   NotFoundException,
+  OnModuleInit,
   Optional,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
@@ -24,7 +25,7 @@ interface MutateOpts {
 }
 
 @Injectable()
-export class TransactionsService {
+export class TransactionsService implements OnModuleInit {
   private readonly logger = new Logger(TransactionsService.name);
 
   constructor(
@@ -35,6 +36,47 @@ export class TransactionsService {
     // Optional: TelegramModule only loads when TELEGRAM_BOT_TOKEN is set.
     @Optional() private readonly telegramNotify?: TelegramNotifyService,
   ) {}
+
+  /**
+   * One-time backfill: attribute legacy transactions to their card. Safe & idempotent
+   * — only fills `cardId` where it's missing AND (bank + cardName) matches exactly one
+   * card (that pair is unique per user). Never deletes or reassigns existing values.
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      const cards = await this.cardsService.listAll();
+      let updated = 0;
+      for (const c of cards) {
+        if (!c.cardName) continue;
+        const res = await this.transactionModel
+          .updateMany(
+            { userId: (c as any).userId, bank: c.bank, cardName: c.cardName, cardId: null },
+            { $set: { cardId: String((c as any)._id) } },
+          )
+          .exec();
+        updated += res.modifiedCount ?? 0;
+      }
+      if (updated > 0) {
+        this.logger.log(`Backfilled cardId on ${updated} transaction(s)`);
+      }
+    } catch (error) {
+      this.logger.warn(
+        `Transaction cardId backfill skipped: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  /** Resolve the owning Card._id from (bank + cardName). Undefined if no exact match. */
+  private async resolveCardId(
+    userId: string,
+    bank: string,
+    cardName: string | undefined,
+  ): Promise<string | undefined> {
+    if (!cardName) return undefined;
+    const cards = await this.cardsService.findAll(userId);
+    const match = cards.find((c) => c.bank === bank && c.cardName === cardName);
+    return match ? String((match as any)._id) : undefined;
+  }
 
   private notifyTelegram(userId: string, message: string) {
     this.telegramNotify
@@ -77,7 +119,16 @@ export class TransactionsService {
       );
     }
 
-    const createdTransaction = new this.transactionModel({ ...createTransactionDto, userId });
+    const cardId = await this.resolveCardId(
+      userId,
+      createTransactionDto.bank,
+      createTransactionDto.cardName,
+    );
+    const createdTransaction = new this.transactionModel({
+      ...createTransactionDto,
+      userId,
+      ...(cardId ? { cardId } : {}),
+    });
     const saved = await createdTransaction.save();
 
     this.eventsGateway.emitNewTransaction(saved);
@@ -112,8 +163,14 @@ export class TransactionsService {
       await this.assertWithinLimit(userId, bank, cardName, amount);
     }
 
+    // Re-attribute to the right card if bank/cardName changed.
+    const cardId = await this.resolveCardId(userId, bank, cardName);
     const updated = await this.transactionModel
-      .findOneAndUpdate({ _id: id, userId }, dto, { new: true })
+      .findOneAndUpdate(
+        { _id: id, userId },
+        { ...dto, ...(cardId ? { cardId } : {}) },
+        { new: true },
+      )
       .exec();
 
     this.eventsGateway.emitTransactionUpdated(updated);

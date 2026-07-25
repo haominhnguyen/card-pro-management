@@ -2,13 +2,13 @@ import { Spin, Empty, Button, Tag, Tooltip, Modal } from 'antd';
 import { App as AntApp } from 'antd';
 import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
 import { useDeleteCard } from '../hooks/useData';
-import { cardUsage } from '../lib/stats';
+import { cardUsage, cardCycleSpend } from '../lib/stats';
 import BankLogo from './BankLogo';
-import type { CreditCard, Stat, Bank } from '../types';
+import type { CreditCard, Transaction, Bank } from '../types';
 
 interface Props {
   cards: CreditCard[];
-  stats: Stat[];
+  transactions: Transaction[];
   banks: Bank[];
   loading: boolean;
   onAddCard: () => void;
@@ -17,7 +17,7 @@ interface Props {
 
 const fmt = (n: number) => n.toLocaleString('vi-VN');
 
-export default function CardsView({ cards, stats, banks, loading, onAddCard, onEditCard }: Props) {
+export default function CardsView({ cards, transactions, banks, loading, onAddCard, onEditCard }: Props) {
   const { message } = AntApp.useApp();
   const deleteMut = useDeleteCard();
 
@@ -78,7 +78,8 @@ export default function CardsView({ cards, stats, banks, loading, onAddCard, onE
             <div className="divide-y divide-gray-50">
               {cards.map(card => {
                 const bank = banks.find(b => b.name === card.bank);
-                const { balance: bal, pct, warn } = cardUsage(card, stats);
+                const { balance: bal, pct, warn } = cardUsage(card, transactions);
+                const cycleSpend = cardCycleSpend(card, transactions);
 
                 return (
                   <div
@@ -142,13 +143,15 @@ export default function CardsView({ cards, stats, banks, loading, onAddCard, onE
                         </span>
                       </div>
                       <div className="mt-1.5">
-                        <Tag
-                          icon={<CalendarOutlined />}
-                          color={warn ? 'red' : 'default'}
-                          style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
-                        >
-                          Chốt ngày {card.statementDate}
-                        </Tag>
+                        <Tooltip title={`Đã chi trong kỳ sao kê hiện tại: ${fmt(cycleSpend)} ₫`}>
+                          <Tag
+                            icon={<CalendarOutlined />}
+                            color={warn ? 'red' : 'default'}
+                            style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
+                          >
+                            Chốt ngày {card.statementDate} · kỳ này {fmt(cycleSpend)} ₫
+                          </Tag>
+                        </Tooltip>
                       </div>
                     </div>
 

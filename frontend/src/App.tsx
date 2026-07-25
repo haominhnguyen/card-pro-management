@@ -139,7 +139,7 @@ function AppContent() {
               element={
                 <CardsView
                   cards={cards}
-                  stats={stats}
+                  transactions={transactions}
                   banks={banks}
                   loading={loading}
                   onAddCard={openAddCard}

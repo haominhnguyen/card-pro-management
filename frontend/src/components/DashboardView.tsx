@@ -151,7 +151,7 @@ export default function DashboardView({
             <div className="divide-y divide-gray-50">
               {cards.map(card => {
                 const bank = banks.find(b => b.name === card.bank);
-                const { balance: bal, pct, warn } = cardUsage(card, stats);
+                const { balance: bal, pct, warn } = cardUsage(card, transactions);
 
                 return (
                   <div key={card._id} className="flex items-center gap-3 px-5 py-2.5">
