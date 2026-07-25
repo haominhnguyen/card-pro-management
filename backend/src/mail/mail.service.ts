@@ -102,6 +102,69 @@ export class MailService {
     }
   }
 
+  /** Send a payment-due reminder listing one or more cards. */
+  async sendPaymentReminder(
+    to: string,
+    name: string,
+    items: { title: string; detail: string }[],
+  ): Promise<void> {
+    const subject = `${this.appName} — Nhắc thanh toán thẻ tín dụng`;
+    const html = this.noticeTemplate(name, 'Nhắc thanh toán', 'Các thẻ dưới đây sắp đến hạn thanh toán:', items);
+    const text =
+      `Xin chào ${name || ''},\n\nNhắc thanh toán:\n` +
+      items.map((i) => `- ${i.title}: ${i.detail}`).join('\n') +
+      `\n\nĐăng nhập CardPro để xem chi tiết.`;
+
+    if (!this.transporter) {
+      this.logger.warn(`[DEV] Payment reminder for ${to}: ${items.map((i) => i.title).join('; ')}`);
+      return;
+    }
+    try {
+      await this.transporter.sendMail({ from: this.from, to, subject, html, text });
+      this.logger.log(`Payment reminder sent to ${to}`);
+    } catch (err) {
+      this.logger.error(
+        `Failed to send payment reminder to ${to}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /** Clean notice email with a bulleted list of items (title + detail). */
+  private noticeTemplate(
+    name: string,
+    heading: string,
+    intro: string,
+    items: { title: string; detail: string }[],
+  ): string {
+    const brand = '#1677ff';
+    const greeting = name ? `Xin chào ${this.escape(name)},` : 'Xin chào,';
+    const rows = items
+      .map(
+        (i) => `<tr><td style="padding:10px 14px;border:1px solid #eef2f7;border-radius:10px;">
+          <div style="font-weight:600;color:#111827;font-size:14px;">${this.escape(i.title)}</div>
+          <div style="color:#6b7280;font-size:13px;margin-top:2px;">${this.escape(i.detail)}</div>
+        </td></tr><tr><td style="height:8px;"></td></tr>`,
+      )
+      .join('');
+    return `<!doctype html>
+<html lang="vi"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f3f4f6;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f4f6;padding:32px 12px;"><tr><td align="center">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.08);">
+      <tr><td style="background:linear-gradient(135deg,${brand} 0%,#0b4bd4 100%);padding:24px 32px;color:#fff;font-size:20px;font-weight:700;">💳 ${this.appName}</td></tr>
+      <tr><td style="padding:28px 32px;">
+        <h1 style="margin:0 0 8px;font-size:19px;color:#111827;">${this.escape(heading)}</h1>
+        <p style="margin:0 0 18px;font-size:14px;line-height:1.6;color:#4b5563;">${greeting}<br>${this.escape(intro)}</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+        <p style="margin:20px 0 0;font-size:12px;line-height:1.6;color:#9ca3af;border-top:1px solid #f0f0f0;padding-top:14px;">
+          Đăng nhập CardPro để xem chi tiết. Email tự động, vui lòng không trả lời.
+        </p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body></html>`;
+  }
+
   private passwordResetTemplate(name: string, otp: string, ttlMinutes: number): string {
     return this.otpTemplate({
       name,

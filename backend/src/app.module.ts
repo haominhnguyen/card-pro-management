@@ -4,6 +4,7 @@ import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
+import { ScheduleModule } from '@nestjs/schedule';
 import { TelegrafModule as TelegramModule } from 'nestjs-telegraf';
 import { TransactionsModule } from './transactions/transactions.module';
 import { BotModule } from './bot/bot.module';
@@ -12,6 +13,7 @@ import { GoogleSheetsModule } from './google-sheets/google-sheets.module';
 import { CardsModule } from './cards/cards.module';
 import { BanksModule } from './banks.module';
 import { AuthModule } from './auth/auth.module';
+import { RemindersModule } from './reminders/reminders.module';
 import { TelegramModule as TelegramLinkModule } from './telegram/telegram.module';
 import { JwtAuthGuard } from './auth/guards/jwt-auth.guard';
 import { AppController } from './app.controller';
@@ -41,12 +43,14 @@ const isTelegramEnabled = !!process.env.TELEGRAM_BOT_TOKEN;
       }),
       inject: [ConfigService],
     }),
+    ScheduleModule.forRoot(),
     AuthModule,
     BanksModule,
     CardsModule,
     TransactionsModule,
     EventsModule,
     GoogleSheetsModule,
+    RemindersModule,
     ...(isTelegramEnabled
       ? [
           TelegramModule.forRootAsync({
