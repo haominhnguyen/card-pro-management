@@ -21,6 +21,10 @@ export class Card {
 
   @Prop({ required: true, min: 1, max: 31 })
   statementDate: number;
+
+  // Day of month the payment is due (1–31). Optional — drives due-date reminders.
+  @Prop({ min: 1, max: 31 })
+  paymentDueDate?: number;
 }
 
 export const CardSchema = SchemaFactory.createForClass(Card);

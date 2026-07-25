@@ -4,6 +4,8 @@ export interface CreditCard {
   cardName: string;
   creditLimit: number;
   statementDate: number;
+  /** Day of month the payment is due (1–31). Drives due-date reminders. */
+  paymentDueDate?: number;
   createdAt?: string;
   updatedAt?: string;
 }

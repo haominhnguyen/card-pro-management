@@ -42,6 +42,7 @@ export default function AddCardDrawer({ open, banks, cards, editing, onClose, on
         cardName: editing.cardName,
         creditLimit: editing.creditLimit,
         statementDate: editing.statementDate,
+        paymentDueDate: editing.paymentDueDate,
       });
     } else {
       form.resetFields();
@@ -84,7 +85,7 @@ export default function AddCardDrawer({ open, banks, cards, editing, onClose, on
     onClose();
   };
 
-  const handleSubmit = async (values: { bank: string; cardName: string; creditLimit: number; statementDate: number }) => {
+  const handleSubmit = async (values: { bank: string; cardName: string; creditLimit: number; statementDate: number; paymentDueDate?: number }) => {
     const bank = values.bank.trim();
     const cardName = values.cardName.trim();
     // A bank may hold many cards, but each card type must be unique within it
@@ -264,6 +265,24 @@ export default function AddCardDrawer({ open, banks, cards, editing, onClose, on
             max={31}
             precision={0}
             placeholder="5"
+            addonBefore="Ngày"
+            addonAfter="hàng tháng"
+            disabled={!hasLimit}
+          />
+        </Form.Item>
+
+        <Form.Item
+          name="paymentDueDate"
+          label="Ngày đến hạn thanh toán (tùy chọn)"
+          rules={[{ type: 'number', min: 1, max: 31, message: 'Ngày từ 1 đến 31' }]}
+          tooltip="Dùng để nhắc bạn trước hạn (email/Telegram/banner). Thường sau ngày chốt ~15 ngày."
+        >
+          <InputNumber
+            style={{ width: '100%' }}
+            min={1}
+            max={31}
+            precision={0}
+            placeholder="20"
             addonBefore="Ngày"
             addonAfter="hàng tháng"
             disabled={!hasLimit}

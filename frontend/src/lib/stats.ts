@@ -68,6 +68,29 @@ export function cardCycleSpend(card: CreditCard, transactions: Transaction[], no
   return exp;
 }
 
+/**
+ * Whole days from today until the card's next payment-due date (day-of-month,
+ * clamped to month length). 0 = due today. null when no due date is set.
+ */
+export function daysUntilDue(paymentDueDate: number | undefined, now: Date = new Date()): number | null {
+  if (!paymentDueDate) return null;
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const clampDay = (y: number, m: number) => Math.min(paymentDueDate, new Date(y, m + 1, 0).getDate());
+  let year = today.getFullYear();
+  let month = today.getMonth();
+  // This month's due date; if already passed, roll to next month.
+  let due = new Date(year, month, clampDay(year, month));
+  if (due < today) {
+    month += 1;
+    if (month > 11) {
+      month = 0;
+      year += 1;
+    }
+    due = new Date(year, month, clampDay(year, month));
+  }
+  return Math.round((due.getTime() - today.getTime()) / 86_400_000);
+}
+
 export interface Totals {
   totalLimit: number;
   totalExpense: number;

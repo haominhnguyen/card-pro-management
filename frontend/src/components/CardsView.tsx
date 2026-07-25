@@ -1,8 +1,8 @@
-import { Spin, Empty, Button, Tag, Tooltip, Modal } from 'antd';
+import { Spin, Empty, Button, Tag, Tooltip, Modal, Alert } from 'antd';
 import { App as AntApp } from 'antd';
-import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined } from '@ant-design/icons';
+import { PlusOutlined, DeleteOutlined, EditOutlined, CalendarOutlined, BellOutlined } from '@ant-design/icons';
 import { useDeleteCard } from '../hooks/useData';
-import { cardUsage, cardCycleSpend } from '../lib/stats';
+import { cardUsage, cardCycleSpend, daysUntilDue } from '../lib/stats';
 import BankLogo from './BankLogo';
 import type { CreditCard, Transaction, Bank } from '../types';
 
@@ -20,6 +20,13 @@ const fmt = (n: number) => n.toLocaleString('vi-VN');
 export default function CardsView({ cards, transactions, banks, loading, onAddCard, onEditCard }: Props) {
   const { message } = AntApp.useApp();
   const deleteMut = useDeleteCard();
+
+  // In-app reminders: cards due within 3 days and cards over 90% utilized.
+  const dueSoon = cards
+    .map(c => ({ card: c, days: daysUntilDue(c.paymentDueDate) }))
+    .filter(x => x.days !== null && x.days <= 3)
+    .sort((a, b) => (a.days as number) - (b.days as number));
+  const overUtil = cards.filter(c => cardUsage(c, transactions).pct > 90);
 
   const handleDelete = (card: CreditCard) => {
     Modal.confirm({
@@ -55,6 +62,30 @@ export default function CardsView({ cards, transactions, banks, loading, onAddCa
           </Button>
         </div>
 
+        {/* In-app reminders */}
+        {(dueSoon.length > 0 || overUtil.length > 0) && (
+          <Alert
+            type={dueSoon.some(d => (d.days as number) <= 0) || overUtil.length > 0 ? 'warning' : 'info'}
+            showIcon
+            icon={<BellOutlined />}
+            message={
+              <div className="text-sm">
+                {dueSoon.map(({ card, days }) => (
+                  <div key={`due-${card._id}`}>
+                    <strong>{card.cardName}</strong> ({card.bank}) —{' '}
+                    {days === 0 ? 'đến hạn thanh toán hôm nay' : `còn ${days} ngày đến hạn thanh toán`} (ngày {card.paymentDueDate}).
+                  </div>
+                ))}
+                {overUtil.map(card => (
+                  <div key={`util-${card._id}`}>
+                    <strong>{card.cardName}</strong> ({card.bank}) — đã dùng trên 90% hạn mức.
+                  </div>
+                ))}
+              </div>
+            }
+          />
+        )}
+
         {/* Empty state */}
         {!loading && cards.length === 0 ? (
           <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-16 text-center">
@@ -80,6 +111,8 @@ export default function CardsView({ cards, transactions, banks, loading, onAddCa
                 const bank = banks.find(b => b.name === card.bank);
                 const { balance: bal, pct, warn } = cardUsage(card, transactions);
                 const cycleSpend = cardCycleSpend(card, transactions);
+                const dueIn = daysUntilDue(card.paymentDueDate);
+                const dueSoonCard = dueIn !== null && dueIn <= 3;
 
                 return (
                   <div
@@ -152,6 +185,15 @@ export default function CardsView({ cards, transactions, banks, loading, onAddCa
                             Chốt ngày {card.statementDate} · kỳ này {fmt(cycleSpend)} ₫
                           </Tag>
                         </Tooltip>
+                        {dueIn !== null && (
+                          <Tag
+                            icon={<BellOutlined />}
+                            color={dueSoonCard ? 'orange' : 'default'}
+                            style={{ margin: '0 0 0 6px', fontSize: 10, lineHeight: '16px', padding: '0 4px' }}
+                          >
+                            {dueIn === 0 ? 'Đến hạn hôm nay' : `Đến hạn sau ${dueIn} ngày`}
+                          </Tag>
+                        )}
                       </div>
                     </div>
 

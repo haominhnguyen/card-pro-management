@@ -20,4 +20,10 @@ export class UpdateCardDto {
   @Min(1)
   @Max(31)
   statementDate?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(1)
+  @Max(31)
+  paymentDueDate?: number;
 }
