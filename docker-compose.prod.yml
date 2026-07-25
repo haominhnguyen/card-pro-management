@@ -54,6 +54,10 @@ services:
     environment:
       NODE_ENV: production
       MONGODB_URI: mongodb://mongo:27017/credit-card-db
+      # Public origin the SPA is served from (same origin as the API via the proxy).
+      # Must match VITE_API_URL and the Cloudflare public hostname. Comma-separate to
+      # allow more than one origin. Set here so it overrides any stale value in .env.
+      FRONTEND_ORIGIN: https://card.haominhnguyen.shop
       # Prefer IPv4 when resolving outbound hosts (e.g. api.telegram.org). Many VPSes
       # lack working IPv6 egress, so Node's default would pick a dead AAAA route and
       # telegraf's getMe() fails with an empty FetchError reason.
