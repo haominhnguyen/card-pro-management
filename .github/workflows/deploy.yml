@@ -127,6 +127,15 @@ jobs:
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d --remove-orphans
 
+      # The nginx config is bind-mounted, so `up -d` won't restart the proxy when
+      # only the file content changed. Reload it so config edits (and re-resolution
+      # of upstream IPs) always take effect; fall back to a restart if reload fails.
+      - name: Reload edge proxy
+        run: |
+          docker compose -f docker-compose.prod.yml exec -T proxy nginx -t \
+            && docker compose -f docker-compose.prod.yml exec -T proxy nginx -s reload \
+            || docker compose -f docker-compose.prod.yml restart proxy
+
       - name: Wait for backend health
         run: |
           for i in $(seq 1 30); do
