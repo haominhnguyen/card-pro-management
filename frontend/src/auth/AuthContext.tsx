@@ -28,6 +28,8 @@ interface AuthContextValue {
   /** true when running in trial / experience mode (no real session). */
   demo: boolean;
   login: (data: LoginPayload) => Promise<void>;
+  /** Sign in with a Google ID token (from Google Identity Services). */
+  loginWithGoogle: (idToken: string) => Promise<void>;
   /** Step 1: submit details → backend emails an OTP. Does NOT create a session. */
   register: (data: RegisterPayload) => Promise<void>;
   /** Step 2: confirm the emailed OTP → account created and logged in. */
@@ -96,6 +98,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryClient.invalidateQueries();
   }, []);
 
+  const loginWithGoogle = useCallback(async (idToken: string) => {
+    const session = await authApi.googleLogin(idToken);
+    setAccessToken(session.accessToken);
+    setUser(session.user);
+    setStatus('authenticated');
+    queryClient.invalidateQueries();
+  }, []);
+
   const register = useCallback(async (data: RegisterPayload) => {
     // Triggers the verification email; the session is established later, in verifyRegistration.
     await authApi.register(data);
@@ -134,8 +144,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ user, status, demo, login, register, verifyRegistration, enterDemo, logout }),
-    [user, status, demo, login, register, verifyRegistration, enterDemo, logout],
+    () => ({ user, status, demo, login, loginWithGoogle, register, verifyRegistration, enterDemo, logout }),
+    [user, status, demo, login, loginWithGoogle, register, verifyRegistration, enterDemo, logout],
   );
 
   if (status === 'loading') {

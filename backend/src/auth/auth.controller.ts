@@ -17,6 +17,7 @@ import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { VerifyRegistrationDto } from './dto/verify-registration.dto';
+import { GoogleLoginDto } from './dto/google-login.dto';
 import { Public } from './decorators/public.decorator';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { JwtRefreshGuard } from './guards/jwt-refresh.guard';
@@ -79,6 +80,17 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const result = await this.authService.refresh(user.userId, user.refreshToken);
+    return this.respondWithSession(res, result);
+  }
+
+  @Public()
+  @Post('google')
+  @HttpCode(HttpStatus.OK)
+  async google(
+    @Body() dto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const result = await this.authService.googleLogin(dto.idToken);
     return this.respondWithSession(res, result);
   }
 

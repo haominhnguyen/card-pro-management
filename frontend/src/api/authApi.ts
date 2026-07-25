@@ -47,6 +47,8 @@ export interface SimpleResult {
 export const authApi = {
   login: (data: LoginPayload): Promise<AuthSession> =>
     axiosClient.post('/api/auth/login', data),
+  googleLogin: (idToken: string): Promise<AuthSession> =>
+    axiosClient.post('/api/auth/google', { idToken }),
   register: (data: RegisterPayload): Promise<PendingVerification> =>
     axiosClient.post('/api/auth/register', data),
   verifyRegistration: (data: VerifyRegistrationPayload): Promise<AuthSession> =>

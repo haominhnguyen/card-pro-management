@@ -41,6 +41,7 @@ jobs:
             # public origin, e.g. https://card.yourdomain.com (same origin as the API).
             build-args: |
               VITE_API_URL=${{ vars.VITE_API_URL }}
+              VITE_GOOGLE_CLIENT_ID=${{ vars.VITE_GOOGLE_CLIENT_ID }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -106,6 +107,8 @@ jobs:
           SMTP_USER: ${{ secrets.SMTP_USER }}
           SMTP_PASS: ${{ secrets.SMTP_PASS }}
           MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
         run: |
           printf '%s\n' "$PROD_ENV_FILE" > .env
           {
@@ -120,6 +123,9 @@ jobs:
             echo "SMTP_USER=$SMTP_USER"
             echo "SMTP_PASS=$SMTP_PASS"
             echo "MAIL_FROM=$MAIL_FROM"
+            # Google SSO (ID-token verification uses the client id as audience).
+            echo "GOOGLE_CLIENT_ID=$GOOGLE_CLIENT_ID"
+            echo "GOOGLE_CLIENT_SECRET=$GOOGLE_CLIENT_SECRET"
           } >> .env
 
       - name: Pull images & start stack

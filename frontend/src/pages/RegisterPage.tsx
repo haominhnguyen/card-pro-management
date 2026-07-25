@@ -13,6 +13,7 @@ import { useAuth } from '../auth/AuthContext';
 import { authApi } from '../api/authApi';
 import { getErrorMessage } from '../auth/getErrorMessage';
 import AuthLayout from './AuthLayout';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 interface FormValues {
   name: string;
@@ -26,7 +27,7 @@ const RESEND_COOLDOWN_SECONDS = 45;
 
 export default function RegisterPage() {
   const { message } = AntApp.useApp();
-  const { register, verifyRegistration, enterDemo } = useAuth();
+  const { register, verifyRegistration, enterDemo, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
 
   const [step, setStep] = useState<Step>('details');
@@ -45,6 +46,19 @@ export default function RegisterPage() {
     enterDemo();
     message.info('Đang vào chế độ dùng thử với dữ liệu mẫu');
     navigate('/dashboard', { replace: true });
+  };
+
+  const handleGoogle = async (idToken: string) => {
+    setSubmitting(true);
+    try {
+      await loginWithGoogle(idToken);
+      message.success('Đăng nhập thành công');
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      message.error(getErrorMessage(err, 'Đăng nhập Google thất bại'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   const handleDetails = async (values: FormValues) => {
@@ -184,6 +198,8 @@ export default function RegisterPage() {
       </Form>
 
       <Divider plain className="!my-4 text-gray-400 text-xs">hoặc</Divider>
+
+      <GoogleSignInButton onCredential={handleGoogle} text="signup_with" disabled={submitting} />
 
       <Button
         size="large"

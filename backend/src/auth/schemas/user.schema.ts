@@ -12,8 +12,17 @@ export class User {
   name: string;
 
   // Never returned by default — explicitly .select('+passwordHash') when needed.
-  @Prop({ required: true, select: false })
-  passwordHash: string;
+  // Optional: OAuth-only accounts (Google) have no password.
+  @Prop({ select: false })
+  passwordHash?: string;
+
+  // Google account id (sub) for accounts linked to / created via Google SSO.
+  @Prop({ index: true, sparse: true })
+  googleId?: string;
+
+  // Profile picture URL from the OAuth provider (optional).
+  @Prop()
+  avatarUrl?: string;
 
   // bcrypt hash of the currently-valid refresh token (rotation + revoke). Hidden by default.
   @Prop({ select: false })

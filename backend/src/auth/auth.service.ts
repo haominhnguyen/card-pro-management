@@ -14,6 +14,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { randomInt } from 'crypto';
 import * as bcrypt from 'bcryptjs';
+import { OAuth2Client } from 'google-auth-library';
 import { User, UserDocument } from './schemas/user.schema';
 import { PasswordReset, PasswordResetDocument } from './schemas/password-reset.schema';
 import {
@@ -161,9 +162,64 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
     }
 
+    // OAuth-only account (created via Google) has no password.
+    if (!user.passwordHash) {
+      throw new UnauthorizedException(
+        'Tài khoản này đăng nhập bằng Google. Vui lòng dùng "Đăng nhập với Google".',
+      );
+    }
+
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) {
       throw new UnauthorizedException('Email hoặc mật khẩu không đúng');
+    }
+
+    return this.issueTokens(user);
+  }
+
+  /**
+   * Sign in (or sign up) with a Google ID token from Google Identity Services.
+   * Verifies the token against our OAuth client id, then finds-or-creates the user
+   * by email (linking googleId to an existing email/password account if needed).
+   */
+  async googleLogin(idToken: string): Promise<AuthResult> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new UnauthorizedException('Đăng nhập Google chưa được cấu hình');
+    }
+
+    let payload: import('google-auth-library').TokenPayload | undefined;
+    try {
+      const client = new OAuth2Client(clientId);
+      const ticket = await client.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Google token không hợp lệ');
+    }
+
+    if (!payload?.email || !payload.email_verified) {
+      throw new UnauthorizedException('Email Google chưa được xác minh');
+    }
+
+    const email = payload.email.toLowerCase().trim();
+    const googleId = payload.sub;
+    const name = payload.name?.trim() || email.split('@')[0];
+    const avatarUrl = payload.picture;
+
+    let user = await this.userModel.findOne({ email }).exec();
+    if (user) {
+      if (!user.isActive) {
+        throw new UnauthorizedException('Tài khoản đã bị vô hiệu hoá');
+      }
+      // Link the Google identity to the existing account if not already linked.
+      if (user.googleId !== googleId || (avatarUrl && user.avatarUrl !== avatarUrl)) {
+        await this.userModel
+          .updateOne({ _id: user._id }, { $set: { googleId, ...(avatarUrl ? { avatarUrl } : {}) } })
+          .exec();
+      }
+    } else {
+      user = await this.userModel.create({ email, name, googleId, avatarUrl });
+      this.logger.log(`New user via Google: ${email}`);
     }
 
     return this.issueTokens(user);

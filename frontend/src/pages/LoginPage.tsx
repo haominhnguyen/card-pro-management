@@ -5,6 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
 import { getErrorMessage } from '../auth/getErrorMessage';
 import AuthLayout from './AuthLayout';
+import GoogleSignInButton from '../components/GoogleSignInButton';
 
 interface FormValues {
   email: string;
@@ -13,9 +14,22 @@ interface FormValues {
 
 export default function LoginPage() {
   const { message } = AntApp.useApp();
-  const { login, enterDemo } = useAuth();
+  const { login, enterDemo, loginWithGoogle } = useAuth();
   const navigate = useNavigate();
   const [submitting, setSubmitting] = useState(false);
+
+  const handleGoogle = async (idToken: string) => {
+    setSubmitting(true);
+    try {
+      await loginWithGoogle(idToken);
+      message.success('Đăng nhập thành công');
+      navigate('/dashboard', { replace: true });
+    } catch (err) {
+      message.error(getErrorMessage(err, 'Đăng nhập Google thất bại'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   const handleTryDemo = () => {
     enterDemo();
@@ -73,6 +87,8 @@ export default function LoginPage() {
       </Form>
 
       <Divider plain className="!my-4 text-gray-400 text-xs">hoặc</Divider>
+
+      <GoogleSignInButton onCredential={handleGoogle} text="signin_with" disabled={submitting} />
 
       <Button
         size="large"
