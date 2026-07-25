@@ -1,7 +1,13 @@
 import axios, { AxiosError, type InternalAxiosRequestConfig } from 'axios';
 import { getAccessToken, setAccessToken, clearAccessToken } from '../auth/tokenStore';
 
-export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+// In production the SPA is served from the SAME origin as the API (both go through
+// the nginx proxy). Using the current origin means the app works under ANY domain
+// pointed at the stack — each domain keeps its own independent session — with no
+// rebuild. In dev the backend runs on a separate port (override via VITE_API_URL).
+export const API_URL = import.meta.env.PROD
+  ? window.location.origin
+  : import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const axiosClient = axios.create({
   baseURL: API_URL,
