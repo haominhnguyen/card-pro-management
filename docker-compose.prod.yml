@@ -69,8 +69,12 @@ services:
         reservations:
           memory: 96M
     depends_on:
+      # Start once mongo's container is up — NOT gated on its healthcheck. On a
+      # memory-tight host mongo can be briefly slow to report healthy, which would
+      # otherwise fail `compose up`. The backend's Mongoose client retries the
+      # connection on its own, so starting early is safe.
       mongo:
-        condition: service_healthy
+        condition: service_started
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 15s
@@ -124,29 +128,6 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
-    depends_on:
-      - proxy
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-        reservations:
-          memory: 32M
-    networks:
-      - app
-
-  # ── Second Cloudflare Tunnel — serve a SECOND domain in parallel ──────────────
-  # Both tunnels route to the same proxy:80. Because the SPA calls the API on its
-  # own origin (see axiosClient), each domain works fully & independently. Configure
-  # this tunnel's public hostname → http://proxy:80 in the Cloudflare dashboard.
-  # Optional: if CLOUDFLARE_TUNNEL_TOKEN_2 is empty the container just idles/retries.
-  cloudflared2:
-    image: cloudflare/cloudflared:latest
-    container_name: credit_card_cloudflared2
-    restart: unless-stopped
-    command: tunnel --no-autoupdate run
-    environment:
-      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN_2}
     depends_on:
       - proxy
     deploy:
