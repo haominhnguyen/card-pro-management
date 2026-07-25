@@ -15,6 +15,30 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+/* Never let the page scroll sideways on small screens. */
+html,
+body {
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+/*
+  iOS Safari auto-zooms the page when a focused <input>/<textarea>/<select> has a
+  font-size below 16px. Several fields use antd's default 14px, so tapping them
+  triggered that zoom — which also made the layout look like it "didn't fit".
+  Forcing ≥16px on mobile removes the zoom entirely (desktop is unaffected).
+*/
+@media screen and (max-width: 640px) {
+  input,
+  textarea,
+  select,
+  .ant-input,
+  .ant-input-number-input,
+  .ant-select-selection-search-input {
+    font-size: 16px !important;
+  }
+}
+
 /* Scrollbar hide utility — not included in Tailwind v4 standard */
 .scrollbar-hide {
   scrollbar-width: none;
